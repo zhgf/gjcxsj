@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+</head>
+<body>
+
+	<script type="text/javascript">
+
+//1. 限制
+//每个域的 cookie 总数是有限的，不过浏览器之间各有不同。
+//  IE6 以及更低版本限制每个域名最多 20 个 cookie。
+//  IE7 和之后版本每个域名最多 50 个。IE7 最初是支持每个域名最大 20 个 cookie，之后被微软的一个补丁所更新。
+//  Firefox 限制每个域最多 50 个 cookie。
+//  Opera 限制每个域最多 30 个 cookie。
+//  Safari 和 Chrome 对于每个域的 cookie 数量限制没有硬性规定
+//当超过单个域名限制之后还要再设置 cookie，浏览器就会清除以前设置的 cookie。
+//IE 和 Opera 会删除最近最少使用过的（LRU，Least Recently Used）cookie，腾出空间给新设置的 cookie。
+//Firefox 看上去好像是随机决定要清除哪个 cookie，所以考虑 cookie 限制非常重要，以免出现不可预期的后果
+//浏览器中对于 cookie 的尺寸也有限制。大多数浏览器都有大约 4096B（加减 1）的长度限制。
+//尺寸限制影响到一个域下所有的 cookie，而并非每个 cookie 单独限制。
+//
+//2. cookie 的构成
+// 名称：一个唯一确定 cookie 的名称。cookie 名称是不区分大小写的，所以 myCookie 和 MyCookie被认为是同一个 cookie。然而，实践中最好将 cookie 名称看作是区分大小写的，因为某些服务器会这样处理 cookie。cookie 的名称必须是经过 URL 编码的。
+// 值：储存在 cookie 中的字符串值。值必须被 URL 编码。
+// 域：cookie 对于哪个域是有效的。所有向该域发送的请求中都会包含这个 cookie 信息。这个值可以包含子域（subdomain，如 www.wrox.com ），也可以不包含它（如. wrox.com ，则对于wrox.com的所有子域都有效）。如果没有明确设定，那么这个域会被认作来自设置 cookie 的那个域。
+// 路径：对于指定域中的那个路径，应该向服务器发送 cookie。例如，你可以指定 cookie 只有从http://www.wrox.com/books/ 中才能访问，那么 http://www.wrox.com 的页面就不会发送 cookie 信息，即使请求都是来自同一个域的。
+// 失效时间：表示 cookie 何时应该被删除的时间戳（也就是，何时应该停止向服务器发送这个cookie）。默认情况下，浏览器会话结束时即将所有 cookie 删除；不过也可以自己设置删除时间。这个值是个 GMT 格式的日期（Wdy, DD-Mon-YYYY HH:MM:SS GMT），用于指定应该删除cookie 的准确时间。因此，cookie 可在浏览器关闭后依然保存在用户的机器上。如果你设置的失效日期是个以前的时间，则 cookie 会被立刻删除。
+// 安全标志：指定后，cookie 只有在使用 SSL 连接的时候才发送到服务器。例如，cookie 信息只能发送给  https://www.wrox.com ，而 http://www.wrox.com 的请求则不能发送 cookie。
+//HTTP/1.1 200 OK
+//Content-type: text/html
+//Set-Cookie: name=value; domain=.wrox.com; path=/; secure
+//Other-header: other-header-value
+//设置了 secure 标志，这个 cookie 只能通过 SSL 连接才能传输。
+//
+//3.JavaScript 中的 cookie
+var CookieUtil = {
+	get: function (name){
+		var cookieName = encodeURIComponent(name) + "=",
+		cookieStart = document.cookie.indexOf(cookieName), 
+		cookieValue = null;
+		if (cookieStart > -1){
+			var cookieEnd = document.cookie.indexOf(";", cookieStart);
+			if (cookieEnd == -1){
+				cookieEnd = document.cookie.length;
+			}
+			cookieValue = decodeURIComponent(document.cookie.substring(cookieStart
+				+ cookieName.length, cookieEnd));
+		}
+		return cookieValue;
+	},
+	set: function (name, value, expires, path, domain, secure) {
+		//cookie的名称，cookie的值，可选的用于指定 cookie何时应被删除的 Date 对象，cookie的可选的 URL路径，
+		//可选的域，以及可选的表示是否要添加 secure 标志的布尔值
+		var cookieText = encodeURIComponent(name) + "=" +
+		encodeURIComponent(value);
+		if (expires instanceof Date) {
+			cookieText += "; expires=" + expires.toGMTString();
+		}
+		if (path) {
+			cookieText += "; path=" + path;
+		}
+		if (domain) {
+			cookieText += "; domain=" + domain;
+		}
+		if (secure) {
+			cookieText += "; secure";
+		}
+		document.cookie = cookieText;
+	},
+	unset: function (name, path, domain, secure){
+		this.set(name, "", new Date(0), path, domain, secure);
+	}
+};
+//
+//4.子 cookie
+//为了绕开浏览器的单域名下的 cookie 数限制，一些开发人员使用了一种称为子 cookie
+//子 cookie 是存放在单个 cookie 中的更小段的数据。也就是使用 cookie 值来存储多个名称值对
+//子 cookie 最常见的的格式如下所示。name=name1=value1&name2=value2&name3=value3&name4=value4&name5=value5
+//
+var SubCookieUtil = {
+	get: function (name, subName){
+		var subCookies = this.getAll(name);
+		if (subCookies){
+			return subCookies[subName];
+		} else {
+			return null;
+		}
+	},
+	getAll: function(name){
+		var cookieName = encodeURIComponent(name) + "=",
+		cookieStart = document.cookie.indexOf(cookieName),
+		cookieValue = null,
+		cookieEnd,
+		subCookies,
+		i,
+		parts,
+		result = {};
+		if (cookieStart > -1){
+			cookieEnd = document.cookie.indexOf(";", cookieStart);
+			if (cookieEnd == -1){
+				cookieEnd = document.cookie.length;
+			}
+			cookieValue = document.cookie.substring(cookieStart + cookieName.length, cookieEnd);
+			if (cookieValue.length > 0){
+				subCookies = cookieValue.split("&");
+				for (i=0, len=subCookies.length; i < len; i++){
+					parts = subCookies[i].split("=");
+					result[decodeURIComponent(parts[0])] =
+					decodeURIComponent(parts[1]);
+				}
+				return result;
+			}
+		}
+		return null;
+	},
+	set: function (name, subName, value, expires, path, domain, secure) {
+		var subcookies = this.getAll(name) || {};
+		subcookies[subName] = value;
+		this.setAll(name, subcookies, expires, path, domain, secure);
+	},
+	setAll: function(name, subcookies, expires, path, domain, secure){
+		var cookieText = encodeURIComponent(name) + "=",
+		subcookieParts = new Array(),
+		subName;
+		for (subName in subcookies){
+			if (subName.length > 0 && subcookies.hasOwnProperty(subName)){
+				subcookieParts.push(encodeURIComponent(subName) + "=" +
+					encodeURIComponent(subcookies[subName]));
+			}
+		}
+		if (cookieParts.length > 0){
+			cookieText += subcookieParts.join("&");
+			if (expires instanceof Date) {
+				cookieText += "; expires=" + expires.toGMTString();
+			}
+			if (path) {
+				cookieText += "; path=" + path;
+			}
+			if (domain) {
+				cookieText += "; domain=" + domain;
+			}
+			if (secure) {
+				cookieText += "; secure";
+			}
+		} else {
+			cookieText += "; expires=" + (new Date(0)).toGMTString();
+		}
+		document.cookie = cookieText;
+	},
+	unset: function (name, subName, path, domain, secure){
+		var subcookies = this.getAll(name);
+		if (subcookies){
+			delete subcookies[subName];
+			this.setAll(name, subcookies, null, path, domain, secure);
+		}
+	},
+	unsetAll: function(name, path, domain, secure){
+		this.setAll(name, null, new Date(0), path, domain, secure);
+	}
+};
+//如果你担心开发中可能会达到单域名的 cookie 上限，那么子 cookie 可是一个非常有吸引力的备选方案。
+//不过，你需要更加密切关注 cookie 的长度，以防超过单个 cookie 的长度限制。
+</script>
+
+</body>
+</html>

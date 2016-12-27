@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+</head>
+<body>
+
+	<script type="text/javascript">
+//IndexedDB
+//1.数据库
+//Indexed Database API，或者简称为 IndexedDB，是在浏览器中保存结构化数据的一种数据库。
+//IndexedDB设计的操作完全是异步进行的。
+//因此，大多数操作会以请求方式进行，但这些操作会在后期执行，然后如果成功则返回结果，如果失败则返回错误。
+//差不多每一次 IndexedDB 操作，都需要你注册 onerror 或 onsuccess 事件处理程序，以确保适当地处理结果。
+var indexedDB = window.indexedDB || window.msIndexedDB || window.mozIndexedDB || window.webkitIndexedDB;
+//IndexedDB就是一个数据库,就是一组位于相同命名空间下的对象的集合.
+//把要打开的数据库名传给 indexDB.open() 
+//调用 indexDB.open() 会返回一个 IDBRequest 对象，在这个对象上可以添加 onerror和 onsuccess 事件处理程序
+var request, database;
+request = indexedDB.open("admin");
+request.onerror = function(event){
+	alert("Something bad happened while trying to open: " +
+		event.target.errorCode);
+};
+request.onsuccess = function(event){
+	database = event.target.result;
+};
+//event.target 都指向 request 对象，
+//如果响应的是 onsuccess 事件处理程序，那么 event.target.result 中将有一个数据库实例对象（ IDBData-base ），这个对象会保存在 database 变量中
+//如果发生了错误，那 event.target.errorCode 中将保存一个错误码，表示问题的性质
+//错误码
+//   IDBDatabaseException.UNKNOWN_ERR (1)：意外错误，无法归类。
+// IDBDatabaseException.NON_TRANSIENT_ERR (2)：操作不合法。
+// IDBDatabaseException.NOT_FOUND_ERR (3)：未发现要操作的数据库。
+// IDBDatabaseException.CONSTRAINT_ERR (4)：违反了数据库约束。
+// IDBDatabaseException.DATA_ERR (5)：提供给事务的数据不能满足要求。
+// IDBDatabaseException.NOT_ALLOWED_ERR (6)：操作不合法。
+// IDBDatabaseException.TRANSACTION_INACTIVE_ERR (7)：试图重用已完成的事务。
+// IDBDatabaseException.ABORT_ERR (8)：请求中断，未成功。
+// IDBDatabaseException.READ_ONLY_ERR (9)：试图在只读模式下写入或修改数据。
+// IDBDatabaseException.TIMEOUT_ERR (10)：在有效时间内未完成操作。
+// IDBDatabaseException.QUOTA_ERR (11)：磁盘空间不足。
+//
+//默认情况下，IndexedDB数据库是没有版本号的，最好一开始就为数据库指定一个版本号。
+//为此，可以调用 setVersion() 方法，传入以字符串形式表示的版本号。
+//同样，调用这个方法也会返回一个请求对象，需要你再指定事件处理程序
+if (database.version != "1.0"){
+	request = database.setVersion("1.0");
+	request.onerror = function(event){
+		alert("Something bad happened while trying to set version: " +
+			event.target.errorCode);
+	};
+	request.onsuccess = function(event){
+		alert("Database initialization complete. Database name: " + database.name +
+			", Version: " + database.version);
+	};
+} else {
+	alert("Database already initialized. Database name: " + database.name +
+		", Version: " + database.version);
+}
+//2. 对象存储空间
+var user = {
+	username: "007",
+	firstName: "James",
+	lastName: "Bond",
+	password: "foo"
+};
+//在创建对象存储空间时，必须指定这么一个键。
+var store = db.createObjectStore("users", { keyPath: "username" });
+//其中第二个参数中的 keyPath 属性，就是空间中将要保存的对象的一个属性，而这个属性将作为存储空间的键来使用
+//
+//可以使用 add() 或 put() 方法来向其中添加数据。这两个方法都接收一个参数，即要保存的对象。
+//这两个方法的区别在空间中已经包含键值相同的对象时会体现出来
+//在这种情况下， add() 会返回错误，而 put() 则会重写原有对象。
+//简单地说，可以把 add() 想象成插入新值，把 put() 想象成更新原有的值。
+//users 中保存着一批用户对象
+var i=0,
+len = users.length;
+while(i < len){
+	store.add(users[i++]);
+}
+//
+//users 中保存着一批用户对象
+var i=0,
+request,
+requests = [],
+len = users.length;
+while(i < len){
+	request = store.add(users[i++]);
+	request.onerror = function(){
+	// 处理错误
+};
+request.onsuccess = function(){
+	// 处理成功
+};
+requests.push(request);
+}
+//每次调用 add() 或 put() 都会创建一个新的针对这个对象存储空间的更新请求。
+//如果想验证请求是否成功完成，可以把返回的请求对象保存在一个变量中，然后再指定 onerror 或 onsuccess 事件处理程序。
+//
+//3. 事务
+//数据库对象上调用 transaction() 方法可以创建事务
+//只要想读取或修改数据，都要通过事务来组织所有操作
+var transaction = db.transaction();
+//这样就能保证只加载 users 存储空间中的数据，以便通过事务进行访问。
+var transaction = db.transaction("users");
+//访问多个对象存储空间，也可以在第一个参数的位置上传入字符串数组
+var transaction = db.transaction(["users", "anotherStore"]);
+//
+//修改访问方式，必须在创建事务时传入第二个参数，这个参数表示访问模式
+//用 IDBTransaction 接口定义的如下常量表示： READ_ONLY （0）表示只读， READ_WRITE （1）表示读写， VERSION_CHANGE （2）表示改变。
+var IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction; //兼容
+var transaction = db.transaction("users", IDBTransaction.READ_WRITE); //读写 users 存储空间
+//取得了事务的索引后，使用 objectStore() 方法并传入存储空间的名称,就可以访问特定的存储空间
+//使用 add() 和 put() 方法添加，使用 get() 可以取得值，使用 delete() 可以删除对象，而使用 clear() 则可以删除所有对象。 
+//get() 和 delete() 方法都接收一个对象键作为参数，而所有这 5 个方法都会返回一个新的请求对象。
+var request = db.transaction("users").objectStore("users").get("007");
+request.onerror = function(event){
+	alert("Did not get the object!");
+};
+request.onsuccess = function(event){
+	var result = event.target.result;
+	alert(result.firstName); //"James"
+};
+// onerror 和 oncomplete 。这两个事件可以提供事务级的状态信息
+transaction.onerror = function(event){
+//整个事务都被取消了
+};
+transaction.oncomplete = function(event){
+//整个事务都成功完成了
+};
+
+//4. 使用游标查询
+//使用事务可以直接通过已知的键检索单个对象。
+//而在需要检索多个对象的情况下，则需要在事务内部创建游标。
+//游标就是一指向结果集的指针。
+//在对象存储空间上调用 openCursor() 方法可以创建游标。
+//openCursor() 方法返回的是一个请求对象，因此必须为该对象指定 onsuccess 和 onerror 事件处理程序
+var store = db.transaction("users").objectStore("users"),
+request = store.openCursor();
+request.onsuccess = function(event){
+//处理成功
+};
+request.onerror = function(event){
+//处理失败
+};
+//在 onsuccess 事件处理程序执行时，可以通过 event.target.result 取得存储空间中的下一个对象。
+//结果集中有下一项时，这个属性中保存一个 IDBCursor 的实例，在没有下一项时，这个属性的值为 null
+// IDBCursor 的实例有以下几个属性。
+// direction ：数值，表示游标移动的方向。
+// 默认值为 IDBCursor.NEXT （0），表示下一项。
+//    IDBCursor.NEXT_NO_DUPLICATE （1）表示下一个不重复的项， 
+//    DBCursor.PREV （2）表示前一项，
+//    IDBCursor.PREV_NO_DUPLICATE 表示前一个不重复的项。
+// key ：对象的键。
+// value ：实际的对象。
+// primaryKey ：游标使用的键。可能是对象键，也可能是索引键（稍后讨论索引键）。
+// 检索某一个结果的信息:
+request.onsuccess = function(event){
+	var cursor = event.target.result;
+	if (cursor){ //必须要检查
+		console.log("Key: " + cursor.key + ", Value: " +
+			JSON.stringify(cursor.value));
+	}
+};
+// cursor.value 是一个对象.所以要先将它转换成JSON字符串
+// 
+// 调用 update() 方法可以用指定的对象更新当前游标的 value 。
+// 与其他操作一样，调用 update() 方法也会创建一个新请求，要为它指定onsuccess 和 onerror 事件处理程序。
+// update() 方法
+request.onsuccess = function(event){
+	var cursor = event.target.result,
+	value,
+	updateRequest;
+	if (cursor){ //必须要检查
+		if (cursor.key == "foo"){
+			value = cursor.value; // 取得当前的值
+			value.password = "magic!"; // 更新密码
+			updateRequest = cursor.update(value); // 请求保存更新
+			updateRequest.onsuccess = function(){
+				// 处理成功
+			};
+			updateReqeust.onerror = function(){
+				// 处理失败
+			};
+		}
+	}
+};
+// delete() 方法
+request.onsuccess = function(event){
+	var cursor = event.target.result,
+	value,
+	deleteRequest;
+	if (cursor){ //必须要检查
+		if (cursor.key == "foo"){
+			deleteRequest = cursor.delete(); // 请求删除当前项
+			deleteRequest.onsuccess = function(){
+				// 处理成功
+			};
+			deleteRequest.onerror = function(){
+				// 处理失败
+			};
+		}
+	}
+};
+//如果当前事务没有修改对象存储空间的权限， update() 和 delete() 会抛出错误。
+//默认情况下，每个游标只发起一次请求。要想发起另一次请求，必须调用下面的一个方法。
+// continue(key) ：移动到结果集中的下一项。参数 key 是可选的，不指定这个参数，游标移动到下一项；指定这个参数，游标会移动到指定键的位置。
+// advance(count) ：向前移动 count 指定的项数。
+// 这两个方法都会导致游标使用相同的请求，因此相同的 onsuccess 和 onerror 事件处理程序也会得到重用。
+request.onsuccess = function(event){
+	var cursor = event.target.result;
+	if (cursor){ //必须要检查
+		console.log("Key: " + cursor.key + ", Value: " + JSON.stringify(cursor.value));
+		cursor.continue(); // 移动到下一项  
+		//调用 continue() 会触发另一次请求，进而再次调用 onsuccess 事件处理程序。
+		//在没有更多项可以迭代时，将最后一次调用 onsuccess 事件处理程序，此时 event.target.result 的值为 null
+	} else {
+		console.log("Done!");
+	}
+};
+//
+//5. 键范围
+//通过游标查找数据的方式太有限,键范围（key range）为使用游标增添了一些灵活性
+//键范围由 IDBKeyRange 的实例表示。
+var IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange;
+//有四种定义键范围的方式。
+//第一种是使用 only() 方法，传入你想要取得的对象的键。
+var onlyRange = IDBKeyRange.only("007");
+//第二种定义键范围的方式是指定结果集的下界。
+//下界表示游标开始的位置。
+//以下键范围可以保证游标从键为 "007" 的对象开始，然后继续向前移动，直至最后一个对象。
+//从键为"007"的对象开始，然后可以移动到最后
+var lowerRange = IDBKeyRange.lowerBound("007");
+//如果你想忽略键为 "007" 的对象，从它的下一个对象开始，那么可以传入第二个参数 true ：
+//从键为"007"的对象的下一个对象开始，然后可以移动到最后
+var lowerRange = IDBKeyRange.lowerBound("007", true);
+//第三种定义键范围的方式是指定结果集的上界，也就是指定游标不能超越哪个键。
+//下面这个键范围可以保证游标从头开始，到取得键为 "ace" 的对象终止。
+//从头开始，到键为"ace"的对象为止
+var upperRange = IDBKeyRange.upperBound("ace");
+//如果你不想包含键为指定值的对象，同样，传入第二个参数 true ：
+//从头开始，到键为"ace"的对象的上一个对象为止
+var upperRange = IDBKeyRange.upperBound("ace", true);
+//第四种定义键范围的方式,同时指定上、下界，使用 bound() 方法。
+//这个方法可以接收 4 个参数：
+//  表示下界的键、
+//  表示上界的键、
+//  可选的表示是否跳过下界的布尔值
+//  可选的表示是否跳过上界的布尔值。
+//从键为"007"的对象开始，到键为"ace"的对象为止
+var boundRange = IDBKeyRange.bound("007", "ace");
+//从键为"007"的对象的下一个对象开始，到键为"ace"的对象为止
+var boundRange = IDBKeyRange.bound("007", "ace", true);
+//从键为"007"的对象的下一个对象开始，到键为"ace"的对象的上一个对象为止
+var boundRange = IDBKeyRange.bound("007", "ace", true, true);
+//从键为"007"的对象开始，到键为"ace"的对象的上一个对象为止
+var boundRange = IDBKeyRange.bound("007", "ace", false, true);
+
+//在定义键范围之后，把它传给 openCursor() 方法，就能得到一个符合相应约束条件的\游标。
+var store = db.transaction("users").objectStore("users"),
+range = IDBKeyRange.bound("007", "ace");
+request = store.openCursor(range);
+request.onsuccess = function(event){
+	var cursor = event.target.result;
+	if (cursor){ //必须要检查
+		console.log("Key: " + cursor.key + ", Value: " + JSON.stringify(cursor.value));
+		cursor.continue(); // 移动到下一项
+	} else {
+		console.log("Done!");
+	}
+};
+//这个例子输出的对象的键为 "007" 到 "ace" ，比上一节最后那个例子输出的值少一些。
+//
+//6. 设定游标方向
+// openCursor() 可以接收两个参数,第一个参数就是刚刚看到的 IDBKeyRange 的实例，第二个是表示方向的数值常量
+var IDBCursor = window.IDBCursor || window.webkitIDBCursor;
+//正常情况下，游标都是从存储空间的第一项开始，调用 continue() 或 advance() 前进到最后一项。
+//游标的默认方向值是 IDBCursor.NEXT 。
+//如果对象存储空间中有重复的项，而你想让游标跳过那些重复的项，可以为 openCursor 传入 IDBCursor.NEXT_NO_DUPLICATE 作为第二个参数：
+var store = db.transaction("users").objectStore("users"),
+request = store.openCursor(null, IDBCursor.NEXT_NO_DUPLICATE);
+//注意， openCursor() 的第一个参数是 null ，表示使用默认的键范围，即包含所有对象。
+//这个游标可以从存储空间中的第一个对象开始，逐个迭代到最后一个对象——但会跳过重复的对象。
+//也可以创建一个游标，让它在对象存储空间中向后移动，即从最后一个对象开始，逐个迭代，直至第一个对象。
+//此时，要传入的常量是 IDBCursor.PREV 和 IDBCursor.PREV_NO_DUPLICATE 。
+var store = db.transaction("users").objectStore("users"),
+request = store.openCursor(null, IDBCursor.PREV);
+//使用 IDBCursor.PREV 或 IDBCursor.PREV_NO_DUPLICATE 打开游标时，每次调用 continue()或 advance() ，都会在存储空间中向后而不是向前移动游标。
+//
+//7. 索引
+//对于某些数据，可能需要为一个对象存储空间指定多个键。
+//比如，若要通过用户 ID 和用户名两种方式来保存用户资料，就需要通过这两个键来存取记录。
+//为此，可以考虑将用户 ID 作为主键，然后为用户名创建索引。要创建索引，首先引用对象存储空间，然后调用 createIndex() 方法，如下所示。
+var store = db.transaction("users").objectStore("users"),
+index = store.createIndex("username", "username", { unique:  false });
+//createIndex() 的第一个参数是索引的名字，第二个参数是索引的属性的名字，第三个参数是一个包含 unique 属性的选项（ options ）对象。
+//这个选项通常都必须指定，因为它表示键在所有记录中是否唯一。
+//createIndex() 的返回值是 IDBIndex 的实例。在对象存储空间上调用 index() 方法也能返回同一个实例
+//要使用一个已经存在的名为 "username" 的索引，可以像下面这样取得该索引。
+var store = db.transaction("users").objectStore("users"),
+index = store.index("username");
+//在索引上调用 openCursor() 方法也可以创建新的游标，除了将来会把索引键而非主键保存在 event.result.key 属性中之外，
+//这个游标与在对象存储空间上调用openCursor() 返回的游标完全一样
+var store = db.transaction("users").objectStore("users"),
+index = store.index("username"),
+request = index.openCursor();
+request.onsuccess = function(event){
+//处理成功
+};
+//在索引上也能创建一个特殊的只返回每条记录主键的游标，那就要调用 openKeyCursor() 方法。
+//这种情况下 event.result.key 中仍然保存着索引键，而 event.result.value 中保存的则是主键，而不再是整个对象
+var store = db.transaction("users").objectStore("users"),
+index = store.index("username"),
+request = index.openKeyCursor();
+request.onsuccess = function(event){
+//处理成功
+// event.result.key 中保存索引键，而 event.result.value 中保存主键
+};
+//使用 get() 方法能够从索引中取得一个对象，只要传入相应的索引键即可；当然，这个方法也将返回一个请求。
+var store = db.transaction("users").objectStore("users"),
+index = store.index("username"),
+request = index.get("007");
+request.onsuccess = function(event){
+//处理成功
+};
+request.onerror = function(event){
+//处理失败
+};
+//要根据给定的索引键取得主键，可以使用 getKey() 方法
+//这个方法也会创建一个新的请求，但event.result.value 等于主键的值，而不是包含整个对象
+var store = db.transaction("users").objectStore("users"),
+index = store.index("username"),
+request = index.getKey("007");
+request.onsuccess = function(event){
+//处理成功
+//event.result.key 中保存索引键，而 event.result.value 中保存主键
+};
+//在这个例子的 onsuccess 事件处理程序中， event.result.value 中保存的是用户 ID。
+//任何时候，通过 IDBIndex 对象的下列属性都可以取得有关索引的相关信息。
+//   name ：索引的名字。
+// keyPath ：传入 createIndex() 中的属性路径。
+// objectStore ：索引的对象存储空间。
+// unique ：表示索引键是否唯一的布尔值。
+//通过对象存储对象的 indexName 属性可以访问到为该空间建立的所有索引
+var store = db.transaction("users").objectStore("users"),
+indexNames = store.indexNames,
+index,
+i = 0,
+len = indexNames.length;
+while(i < len){
+	index = store.index(indexNames[i++]);
+	console.log("Index name: " + index.name + ", KeyPath: " + index.keyPath +", Unique: " + index.unique);
+}
+//在对象存储空间上调用 deleteIndex() 方法并传入索引的名字可以删除索引。
+var store = db.transaction("users").objectStore("users");
+store.deleteIndex("username");
+//因为删除索引不会影响对象存储空间中的数据，所以这个操作没有任何回调函数。
+//
+//8. 并发问题
+//虽然网页中的 IndexedDB提供的是异步 API，但仍然存在并发操作的问题。如果浏览器的两个不同的标签页打开了同一个页面，
+//那么一个页面试图更新另一个页面尚未准备就绪的数据库的问题就有可能发生。把数据库设置为新版本有可能导致这个问题。
+//因此，只有当浏览器中仅有一个标签页使用数据库的情况下，调用 setVersion() 才能完成操作。
+//刚打开数据库时，要记着指定 onversionchange 事件处理程序。当同一个来源的另一个标签页调用 setVersion() 时，就会执行这个回调函数。
+//处理这个事件的最佳方式是立即关闭数据库，从而保证版本更新顺利完成。
+var request, database;
+request = indexedDB.open("admin");
+request.onsuccess = function(event){
+	database = event.target.result;
+	database.onversionchange = function(){
+		database.close();
+	};
+};
+//每次成功打开数据库，都应该指定 onversionchange 事件处理程序
+//调用 setVersion() 时，指定请求的 onblocked 事件处理程序也很重要。
+//在你想要更新数据库的版本但另一个标签页已经打开数据库的情况下，就会触发这个事件处理程序
+//最好先通知用户关闭其他标签页，然后再重新调用 setVersion()
+var request = database.setVersion("2.0");
+request.onblocked = function(){
+	alert("Please close all other tabs and try again.");
+};
+request.onsuccess = function(){
+//处理成功，继续
+};
+//请记住，其他标签页中的 onversionchange 事件处理程序也会执行。
+//
+//9. 限制
+//
+//IndexedDB 数据库只能由同源（相同协议、域名和端口）页面操作，因此不能跨域共享信息。
+//。Firefox 4+目前的上限是每个源 50MB，而Chrome 的限制是 5MB。移动设备上的 Firefox 最多允许保存 5MB，
+//如果超过了这个配额，将会请求用户的许可。
+</script>
+
+</body>
+</html>

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+</head>
+<body>
+
+<!-- 离线检测 -->
+<script type="text/javascript">
+//HTML5为此定义了一个 navigator.onLine属性，这个属性值为 true 表示设备能上网，值为 false 表示设备离线。
+if (navigator.onLine){
+//正常工作
+} else {
+//执行离线状态时的任务
+}
+EventUtil.addHandler(window, "online", function(){
+alert("Online");
+});
+EventUtil.addHandler(window, "offline", function(){
+alert("Offline");
+});
+//为了检测应用是否离线，在页面加载后，最好先通过 navigator.onLine 取得初始的状态。然后，就是通过上述两个事件来确定网络连接状态是否变化
+</script>
+
+</body>
+</html>

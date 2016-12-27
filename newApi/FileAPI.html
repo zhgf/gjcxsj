@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+</head>
+<body>
+	
+	<!-- fileReader类型 -->
+	<script type="text/javascript">
+//  name ：本地文件系统中的文件名。
+//size ：文件的字节大小。
+//type ：字符串，文件的 MIME 类型。
+//lastModifiedDate ：字符串，文件上一次被修改的时间（只有 Chrome 实现了这个属性）。
+//  通过侦听 change 事件并读取 files 集合就可以知道选择的每个文件的信息
+var filesList = document.getElementById("files-list");
+EventUtil.addHandler(filesList, "change", function(event){
+	var files = EventUtil.getTarget(event).files,
+	i = 0,
+	len = files.length;
+	while (i < len){
+		console.log(files[i].name + " (" + files[i].type + ", " + files[i].size +" bytes) ");
+		i++;
+	}
+});
+//  通过它提供的 FileReader 类型甚至还可以读取文件中的数据.
+//  readAsText(file,encoding) ：以纯文本形式读取文件，将读取到的文本保存在 result 属性中。第二个参数用于指定编码类型，是可选的。
+//  readAsDataURL(file) ：读取文件并将文件以数据 URI 的形式保存在 result 属性中。
+//  readAsBinaryString(file) ：读取文件并将一个字符串保存在 result 属性中，字符串中的每个字符表示一字节。
+//  readAsArrayBuffer(file) ：读取文件并将一个包含文件内容的 ArrayBuffer 保存在result 属性中。
+//  FileReader 也提供了几个事件。其中最有用的三个事件是progress 、 error 和 load ，
+//  分别表示是否又读取了新数据、是否发生了错误以及是否已经读完了整个文件.
+//  每过 50ms 左右，就会触发一次 progress 事件，通过事件对象可以获得与 XHR 的 progress 事件相同的信息（属性）： lengthComputable 、 loaded 和 total 。
+//  另外，尽管可能没有包含全部数据，但每次 progress 事件中都可以通过 FileReader 的 result 属性读取到文件内容.
+//  由于种种原因无法读取文件，就会触发 error 事件。触发 error 事件时，相关的信息将保存到FileReader 的 error 属性中。
+//  这个属性中将保存一个对象，该对象只有一个属性 code ，即错误码。
+//  这个错误码是 1 表示未找到文件，是 2 表示安全性错误，是 3 表示读取中断，是 4 表示文件不可读，是5 表示编码错误。
+//  文件成功加载后会触发 load 事件；如果发生了 error 事件，就不会发生 load 事件。
+var filesList = document.getElementById("files-list");
+EventUtil.addHandler(filesList, "change", function(event){
+	var info = "",
+	output = document.getElementById("output"),
+	progress = document.getElementById("progress"),
+	files = EventUtil.getTarget(event).files,
+	type = "default",
+	reader = new FileReader();
+	if (/image/.test(files[0].type)){
+		reader.readAsDataURL(files[0]);
+		type = "image";
+	} else {
+		reader.readAsText(files[0]);
+		type = "text";
+	}
+	reader.onerror = function(){
+		output.innerHTML = "Could not read file, error code is " +
+		reader.error.code;
+	};
+	reader.onprogress = function(event){
+		if (event.lengthComputable){
+			progress.innerHTML = event.loaded + "/" + event.total;
+		}
+	};
+	reader.onload = function(){
+		var html = "";
+		switch(type){
+			case "image":
+			html = "<img src=\"" + reader.result + "\">";
+			break;
+			case "text":
+			html = reader.result;
+			break;
+		}
+		output.innerHTML = html;
+	};
+});
+// 如果想中断读取过程，可以调用 abort() 方法
+// 在触发 load 、 error或 abort 事件后，会触发另一个事件 loadend 。 
+// loadend 事件发生就意味着已经读取完整个文件，或者读取时发生了错误，或者读取过程被中断。
+</script>
+
+<!-- 读取部分内容 -->
+<script type="text/javascript">
+// 只想读取文件的一部分而不是全部内容, File 对象还支持一个 slice() 方法，
+// 这个方法在 Firefox 中的实现叫 mozSlice() ，在 Chrome 中的实现叫 webkitSlice() ，Safari 的 5.1 及之前版本不支持这个方法。
+//  slice() 方法接收两个参数：起始字节及要读取的字节数。这个方法返回一个 Blob 的实例， Blob 是 File 类型的父类型。
+function blobSlice(blob, startByte, length){
+	if (blob.slice){
+		return blob.slice(startByte, length);
+	} else if (blob.webkitSlice){
+		return blob.webkitSlice(startByte, length);
+	} else if (blob.mozSlice){
+		return blob.mozSlice(startByte, length);
+	} else {
+		return null;
+	}
+}
+// Blob 类型有一个 size 属性和一个 type 属性，而且它也支持 slice() 方法，以便进一步切割数据。
+// 通过 FileReader 也可以从 Blob 中读取数据。下面这个例子只读取文件的 32B 内容。
+var filesList = document.getElementById("files-list");
+EventUtil.addHandler(filesList, "change", function(event){
+	var info = "",
+	output = document.getElementById("output"),
+	progress = document.getElementById("progress"),
+	files = EventUtil.getTarget(event).files,
+	reader = new FileReader(),
+	blob = blobSlice(files[0], 0, 32);
+	if (blob){
+		reader.readAsText(blob);
+		reader.onerror = function(){
+			output.innerHTML = "Could not read file, error code is " +
+			reader.error.code;
+		};
+		reader.onload = function(){
+			output.innerHTML = reader.result;
+		};
+	} else {
+		alert("Your browser doesn' t support slice().");
+	}
+});
+</script>
+
+<!-- 对象url -->
+<script type="text/javascript">
+//要创建对象 URL，可以使用 window.URL.createObjectURL() 方法，并传入File 或 Blob 对象
+function createObjectURL(blob){
+	if (window.URL){
+		return window.URL.createObjectURL(blob);
+	} else if (window.webkitURL){
+		return window.webkitURL.createObjectURL(blob);
+	} else {
+		return null;
+	}
+}
+// 这个函数的返回值是一个字符串，指向一块内存的地址。因为这个字符串是 URL，所以在 DOM 中也能使用。
+//例如
+var filesList = document.getElementById("files-list");
+EventUtil.addHandler(filesList, "change", function(event){
+	var info = "",
+	output = document.getElementById("output"),
+	progress = document.getElementById("progress"),
+	files = EventUtil.getTarget(event).files,
+	reader = new FileReader(),
+	url = createObjectURL(files[0]);
+	if (url){
+		if (/image/.test(files[0].type)){
+			output.innerHTML = "<img src=\"" + url + "\">";
+		} else {
+			output.innerHTML = "Not an image.";
+		}
+	} else {
+		output.innerHTML = "Your browser doesn't support object URLs.";
+	}
+});
+//如果不再需要相应的数据，最好释放它占用的内容。但只要有代码在引用对象 URL，内存就不会释放。
+//要手工释放内存，可以把对象 URL 传给 window.URL.revokeOjbectURL() 
+//页面卸载时会自动释放对象 URL 占用的内存。不过，为了确保尽可能少地占用内存，最好在不需要某个对象 URL 时，就马上手工释放其占用的内存。
+function revokeObjectURL(url){
+	if (window.URL){
+		window.URL.revokeObjectURL(url);
+	} else if (window.webkitURL){
+		window.webkitURL.revokeObjectURL(url);
+	}
+}
+</script>
+
+<!-- 读取拖放的文件 -->
+<script type="text/javascript">
+//在页面上创建了自定义的放置目标之后，你可以从桌面上把文件拖放到该目标。
+//与拖放一张图片或者一个链接类似，从桌面上把文件拖放到浏览器中也会触发 drop 事件。
+//而且可以在 event.dataTransfer.files中读取到被放置的文件，当然此时它是一个 File 对象，与通过文件输入字段取得的 File 对象一样。
+//将放置到页面中自定义的放置目标中的文件信息显示出来：
+var droptarget = document.getElementById( "droptarget");
+function handleEvent(event){
+	var info = "",
+	output = document.getElementById("output"),
+	files, i, len;
+	EventUtil.preventDefault(event); //取消默认行为
+	if (event.type == "drop"){
+		files = event.dataTransfer.files;
+		i = 0;
+		len = files.length;
+		while (i < len){
+			info += files[i].name + " (" + files[i].type + ", " + files[i].size +
+			" bytes)<br>";
+			i++;
+		}
+		output.innerHTML = info;
+	}
+}
+EventUtil.addHandler(droptarget, "dragenter", handleEvent);
+EventUtil.addHandler(droptarget, "dragover", handleEvent);
+EventUtil.addHandler(droptarget, "drop", handleEvent);
+</script>
+
+<!-- 使用XHR上传文件 -->
+<script type="text/javascript">
+//创建一个 FormData对象，通过它调用 append() 方法并传入相应的 File 对象作为参数。
+//然后，再把 FormData 对象传递给 XHR 的 send() 方法，结果与通过表单上传一模一样。
+var droptarget = document.getElementById("droptarget");
+function handleEvent(event){
+	var info = "",
+	output = document.getElementById("output"),
+	data, xhr,
+	files, i, len;
+	EventUtil.preventDefault(event);
+	if (event.type == "drop"){
+		data = new FormData();
+		files = event.dataTransfer.files;
+		i = 0;
+		len = files.length;
+		while (i < len){
+			data.append("file" + i, files[i]);
+			i++;
+		}
+		xhr = new XMLHttpRequest();
+		xhr.open("post", "FileAPIExample06Upload.php", true);
+		xhr.onreadystatechange = function(){
+			if (xhr.readyState == 4){
+				alert(xhr.responseText);
+			}
+		};
+		xhr.send(data);
+	}
+}
+EventUtil.addHandler(droptarget, "dragenter", handleEvent);
+EventUtil.addHandler(droptarget, "dragover", handleEvent);
+EventUtil.addHandler(droptarget, "drop", handleEvent);
+//这个例子创建一个 FormData 对象，与每个文件对应的键分别是 file0 、 file1 、 file2 这样的格式。
+//注意，不用额外写任何代码，这些文件就可以作为表单的值提交。而且，也不必使用 FileReader ，只要传入 File 对象即可
+</script>
+
+</body>
+</html>

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+</head>
+<body>
+
+	<script type="text/javascript">
+//页面最小化了或者隐藏在了其他标签页后面，那么有些功能是可以停下来的，比如轮询服务器或者某些动画效果。
+//document.hidden ：表示页面是否隐藏的布尔值。页面隐藏包括页面在后台标签页中或者浏览器最小化。
+//document.visibilityState ：表示下列 4 个可能状态的值。
+//  页面在后台标签页中或浏览器最小化。
+//  页面在前台标签页中。
+//  实际的页面已经隐藏，但用户可以看到页面的预览（就像在 Windows 7 中，用户把鼠标移动到任务栏的图标上，就可以显示浏览器中当前页面的预览）。
+//  页面在屏幕外执行预渲染处理。
+//visibilitychange 事件：当文档从可见变为不可见或从不可见变为可见时，触发该事件。
+function isHiddenSupported(){
+	return typeof (document.hidden || document.msHidden ||
+		document.webkitHidden) != "undefined";
+}
+if (document.hidden || document.msHidden || document.webKitHidden){
+//页面隐藏了
+} else {
+//页面未隐藏
+}
+function handleVisibilityChange(){
+	var output = document.getElementById("output"),
+	msg;
+	if (document.hidden || document.msHidden || document.webkitHidden){
+		msg = "Page is now hidden. " + (new Date()) + "<br>";
+	} else {
+		msg = "Page is now visible. " + (new Date()) + "<br>";
+	}
+	output.innerHTML += msg;
+}
+//要为两个事件都指定事件处理程序
+EventUtil.addHandler(document, "msvisibilitychange", handleVisibilityChange);
+EventUtil.addHandler(document, "webkitvisibilitychange", handleVisibilityChange);
+</script>
+
+</body>
+</html>

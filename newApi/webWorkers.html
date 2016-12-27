@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<title>Document</title>
+</head>
+<body>
+	
+<script type="text/javascript">
+//实例化 Worker对象并传入要执行的 JavaScript 文件名就可以创建一个新的 Web Worker。例如：
+var worker = new Worker("stufftodo.js");
+//这行代码会导致浏览器下载 stufftodo.js ，但只有 Worker 接收到消息才会实际执行文件中的代码。
+//要给 Worker 传递消息，可以使用 postMessage() 方法（与 XDM 中的 postMessage() 方法类似）：
+worker.postMessage("start!");
+worker.postMessage({
+	type: "command",
+	message: "start! "
+});
+//Worker是通过 message 和 error 事件与页面通信的
+//Worker 返回的数据也可以是任何能够被序列化的值：
+worker.onmessage = function(event){
+	var data = event.data;
+//对数据进行处理
+}
+//Worker 不能完成给定的任务时会触发 error 事件
+//Worker 内部的 JavaScript 在执行过程中只要遇到错误，就会触发 error 事件。
+//发生 error 事件时，事件对象中包含三个属性： filename 、lineno 和 message ，分别表示发生错误的文件名、代码行号和完整的错误消息
+worker.onerror = function(event){
+	console.log("ERROR: " + event.filename + " (" + event.lineno + "): " + event.message);
+};
+//建议大家在使用 Web Workers 时，始终都要使用 onerror 事件处理程序.否则，Worker 就会在发生错误时，悄无声息地失败了。
+//任何时候，只要调用 terminate() 方法就可以停止 Worker 的工作,
+//Worker 中的代码会立即停止执行，后续的所有过程都不会再发生（包括 error 和 message 事件也不会再触发）
+worker.terminate(); //立即停止 Worker 的工作
+</script>
+
+<!-- Worker全局作用域 -->
+<script type="text/javascript">
+//它所执行的 JavaScript 代码完全在另一个作用域中，与当前网页中的代码不共享作用域
+//在 Web Worker 中，同样有一个全局对象和其他对象以及方法
+//WebWorker 中的代码不能访问 DOM，也无法通过任何方式影响页面的外观
+//Web Worker 中的全局对象是 worker 对象本身.也就是说，在这个特殊的全局作用域中， this 和 self 引用的都是 worker 对象
+//为便于处理数据，Web Worker 本身也是一个最小化的运行环境
+// 最小化的 navigator 对象，包括 onLine 、 appName 、 appVersion 、 userAgent 和 platform属性；
+// 只读的 location 对象； setTimeout() 、 setInterval() 、 clearTimeout() 和 clearInterval() 方法；
+// XMLHttpRequest 构造函数
+//当页面在 worker 对象上调用 postMessage() 时，数据会以异步方式被传递给 worker ，进而触发worker 中的 message 事件。
+//为了处理来自页面的数据，同样也需要创建一个 onmessage 事件处理程序
+//Web Worker 内部的代码
+self.onmessage = function(event){
+var data = event.data;
+//处理数据
+};
+//这里的 self 引用的是 Worker 全局作用域中的 worker 对象（与页面中的 Worker 对象不同一个对象）。Worker 完成工作后，通过调用 postMessage() 可以把数据再发回页面
+//Web Worker 内部的代码
+self.onmessage = function(event){
+var data = event.data;
+//别忘了，默认的 sort()方法只比较字符串
+data.sort(function(a, b){
+return a – b;
+});
+self.postMessage(data);
+};
+//在 Worker 中调用 postMessage() 会以异步方式触发页面中 Worker 实例的 message 事件。
+//如果页面想要使用这个 Worker，可以这样：
+//在页面中
+var data = [23,4,7,9,2,14,6,651,87,41,7798,24],
+worker = new Worker("WebWorkerExample01.js");
+worker.onmessage = function(event){
+var data = event.data;
+//对排序后的数组进行操作
+};
+//将数组发送给 worker 排序
+worker.postMessage(data);
+
+//排序的确是比较消耗时间的操作，因此转交给 Worker 做就不会阻塞用户界面了
+//把彩色图像转换成灰阶图像以及加密解密之类的操作也是相当费时的
+//调用 close() 方法也可以停止工作。就像在页面中调用 terminate() 方法一样，Worker 停止工作后就不会再有事件发生了
+//Web Worker 内部的代码
+self.close();
+
+//Worker 的全局作用域提供这个功能，即我们可以调用 importScripts() 方法。
+//这个方法接收一个或多个指向 JavaScript 文件的 URL。
+//每个加载过程都是异步进行的，因此所有脚本加载并执行之后， importScripts() 才会执行。
+//Web Worker 内部的代码
+importScripts("file1.js", "file2.js");
+//即使 file2.js 先于 file1.js 下载完，执行的时候仍然会按照先后顺序执行。
+//而且，这些脚本是在 Worker 的全局作用域中执行，如果脚本中包含与页面有关的 JavaScript 代码，那么脚本可能无法正确运行。
+</script>
+
+</body>
+</html>
